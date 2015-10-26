@@ -117,7 +117,8 @@ TOKEN : /* NUMBERS AND IDENTIFIERS */
 	| < #DIGIT : ["0" - "9"] >
 	| < ID : (<LETTER>)+ >
 	| < #LETTER : ["a" - "z", "A" - "Z"] >
-	| < IDENTIFIER : (<DIGIT>|<LETTER>|"_") >
+	//| < IDENTIFIER : (<DIGIT>|<LETTER>|"_") >
+	| < #UNDERSCORE : ["_"] >
 }
 
 TOKEN : /* ANYTHING NOT RECOGNISED SO FAR */
