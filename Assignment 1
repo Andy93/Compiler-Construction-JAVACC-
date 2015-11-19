@@ -1,43 +1,266 @@
-# Compiler-Construction-JAVACC-
+// ** SECTION 1 - OPTIONS **
+options{
+    IGNORE_CASE = true;
 
-options { JAVA_UNICODE_ESCAPE = true; }
-
-PARSER_BEGIN(SLPTokeniser)
-public class SLPTokeniser {
-	public static void main(String args[]) {
-		SLPTokeniser tokeniser;
-		if (args.length == 0) {
-			System.out.println("Reading from standard input . . .");
-			tokeniser = new SLPTokeniser(System.in);
-		} else if (args.length == 1) {
-			try {
-				tokeniser = new SLPTokeniser(new java.io.FileInputStream(args[0]));
-			} catch (java.io.FileNotFoundException e) {
-				System.err.println("File " + args[0] + " not found.");
-				return;
-			}
-		}
-		else {
-			System.out.println("SLP Tokeniser: Usage is one of:");
-			System.out.println(" java SLPTokeniser < inputfile");
-			System.out.println("OR");
-			System.out.println(" java SLPTokeniser inputfile");
-			return;
-		}
-		for (Token t = getNextToken(); t.kind!=EOF; t = getNextToken()) {
-			// Print out the actual text for the constants, identifiers etc.
-			if (t.kind==NUM){
-				System.out.print("Number");
-				System.out.print("("+t.image+") ");
-			}
-			else if (t.kind==ID){
-				System.out.print("Identifier");
-				System.out.print("("+t.image+") ");
-			}
-			else
-				System.out.print(t.image+" ");
-		}
-	}
 }
-PARSER_END(SLPTokeniser)
 
+// ** SECTION 2 - USER CODE **
+PARSER_BEGIN(BasicLParser)
+
+public class BasicLParser {
+    public static void main(String [] args){
+        BasicLParser parser;
+        if(args.length == 0){
+            System.out.println("BasicLParser: Reading from Standard Input...");
+            parser = new BasicLParser(System.in);
+        }
+        else if(args.length == 1){
+            System.out.println("BasicLParser: Reading from file " + args[0] + "...");
+            try{
+                parser = new BasicLParser(new java.io.FileInputStream(args[0]));
+            }
+            catch(java.io.FileNotFoundException e){
+                System.out.println("BasicLParser: File " + args[0] + "  not found");
+                return;
+            }
+        }
+        else{
+        System.out.println("BasicLParser: Usage is one of : ");
+        System.out.println("\t\t java BasicLParser < inputFile");
+        System.out.println("OR");
+        System.out.println("\t\t java BasicLParser inputFile");
+        return;
+        }
+        try
+        {
+          parser.program();
+      	}catch(ParseException e){
+      	  System.out.println(e.getMessage());
+		  return;
+      	}
+    }
+}
+
+PARSER_END(BasicLParser)
+
+// ** SECTION 3 - Token Definitions **
+
+TOKEN_MGR_DECLS :
+{
+    static int commentNesting = 0;
+}
+
+SKIP : /* COMMENTS */
+{"/*" { commentNesting++; } : IN_COMMENT
+
+}
+<IN_COMMENT> SKIP :
+{       "/*" { commentNesting++; }
+    | "*/" { commentNesting--;
+            if (commentNesting == 0)
+                SwitchTo(DEFAULT);
+           }
+    | <~[]>
+}
+
+SKIP : // SINGLE LINE COMMENTS
+{
+    <SINGLE_LINE_COMMENT : "--" (~["\n", "\r"])* ("\r" | "\n" | "\r\n") >
+}
+
+SKIP : // IGNORE SPACES, TABS, NEWLINES, FORM FEEDS & CARRIAGE RETURNS
+{
+            " "
+        |   "\t"
+        |   "\n"
+        |   "\f"
+        |   "\r"
+}
+
+TOKEN :  /* KEYWORDS */
+{   <AND : "and">
+    |<BOOL : "bool">
+    |<CONST : "const">
+    |<DO : "do">
+    |<ELSE : "else">
+    |<FALSE : "false">
+    |<IF : "if">
+    |<INT : "int">
+    |<MAIN : "main">
+    |<NOT : "not">
+    |<OR : "or">
+    |<RETURN : "return">
+    |<THEN : "then">
+    |<TRUE : "true">
+    |<VAR : "var">
+    |<VOID : "void">
+    |<WHILE : "while">
+    |<BEGIN : "begin">
+    |<END : "end">
+}
+
+TOKEN :  /* OPERATORS RELATIONS */
+{   <ADD : "+">
+    |<SUBTRACT : "-">
+    |<MULTIPLY : "*">
+    |<DIVIDE : "/">
+    |<EQUAL : "=">
+    |<NOTEQUAL : "!=">
+    |<LESSTHAN : "<">
+    |<GREATERTHAN : ">">
+    |<LESSTHANEQUAL : "<=">
+    |<GREATERTHANEQUAL : ">=">
+    |<LBRACKET : "(">
+    |<RBRACKET : ")">
+    |<COMMA : ",">
+    |<SEMICOLON : ";">
+    |<COLON : ":">
+    |<ASSIGN : ":=">
+    |<EPSILON : "">
+}
+
+TOKEN : /*IDENTIFIERS */
+{
+    < IDENTIFIER : <LETTER> (<LETTER> | <DIGIT> | <UNDERSCORE>)*>
+    | < #LETTER : ["a" - "z", "A" - "Z"] >
+    | < #DIGIT : ["0" - "9"] >
+    | < UNDERSCORE : ["_"] >
+}
+
+TOKEN :  /*NUMBER */
+{
+    <NUMBER : (["0" - "9"])+>
+}
+
+TOKEN : /* ANYTHING NOT RECOGNISED SO FAR */
+{
+    < OTHER : ~[] >
+}
+
+// ** SECTION 4 - Grammar Rules **
+void program() :
+{}
+{
+    ( decl())*
+    ( function())*
+    main_prog()
+}
+
+void decl() :
+{}
+{
+    (var_decl() | const_decl())
+}
+
+void var_decl()  :
+{}
+{
+    <VAR> ident_list() <COLON> type() (<COMMA> ident_list() <COLON> type()
+    )* <SEMICOLON>
+}
+
+void const_decl() :
+{}
+{
+      <CONST> <IDENTIFIER> <COLON> type() <EQUAL> expression() ( <COMMA> <IDENTIFIER> <COLON> type() <EQUAL> expression() )* <SEMICOLON> 
+}
+
+void function() :
+{}
+{
+    type() <IDENTIFIER> <LBRACKET>param_list()<RBRACKET>
+     <BEGIN>
+     ( decl() )*
+     (statement() <SEMICOLON>)*
+     <RETURN>(expression() | <EPSILON>)<SEMICOLON>
+     <END>
+}
+
+void param_list() :
+{}
+{
+    (<IDENTIFIER> <COLON> type() ( <COMMA> <IDENTIFIER> <COLON> type())* | <EPSILON>)
+}
+
+void type() :
+{}
+{
+    <INT>|<BOOL>|<VOID>
+}
+
+void main_prog() :
+{}
+{
+    <MAIN>
+    <BEGIN>
+    (decl())*
+  	(statement()<SEMICOLON>)*
+    <END>
+}
+
+/*
+statement := identifier := expression
+                | identifier ( arg_list )
+                | BEGIN ( statement ; )* END
+                | IF condition THEN statement ; ELSE statement
+                | WHILE condition DO statement
+                | ε 
+*/
+
+void statement() :
+{}
+{
+    <IDENTIFIER> ( <ASSIGN>  expression()|  (arg_list()))
+    | <BEGIN>(statement() <SEMICOLON>)*<END>
+    | <IF> condition() <THEN> statement() <SEMICOLON> <ELSE> statement()
+    | <WHILE> condition() <DO> statement()
+    | <EPSILON>
+}
+
+/*
+expression := fragment ( ( + | - | * | / )  fragment )*
+                | ( expression ) 
+                | identifier ( arg_list )
+*/
+void expression() :
+{}
+{
+    fragment()((<ADD>|<SUBTRACT>|<MULTIPLY>|<DIVIDE>) condition())*
+	| <LBRACKET>expression()<RBRACKET> 
+  	| <NOT> expression()
+}
+
+//fragment := identifier | TRUE | FALSE | number | ( + | - ) fragment | expression
+void fragment() :
+{}
+{
+    <IDENTIFIER> [arg_list()]|<TRUE>|<FALSE>|<NUMBER>|(<ADD>|<SUBTRACT>)fragment()
+}
+
+//condition :=    NOT condition
+//                | expression ( = | != | < | > | <= | >= ) expression
+//                | condition (AND | OR) condition
+//                | identifier ( arg_list )
+void condition() :
+{}
+{
+    <NOT> condition()
+    | expression() ((<EQUAL>|<NOTEQUAL>|<LESSTHAN>|<GREATERTHAN>|<GREATERTHANEQUAL>|<LESSTHANEQUAL>)|(<AND>|<OR>)|condition())*
+}
+
+
+
+//ident_list := identifier ( , identifier )*
+void ident_list() :
+{}
+{
+  <IDENTIFIER>(<COMMA> <IDENTIFIER>)*
+}
+
+
+//arg_list := ( identifier ( , identifier )* | ε  )
+void arg_list() :
+{}
+{
+  (<IDENTIFIER>(<COMMA> <IDENTIFIER>)* | <EPSILON>)
+}
