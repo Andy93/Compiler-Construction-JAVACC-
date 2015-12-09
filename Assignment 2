@@ -1,13 +1,17 @@
 // ** SECTION 1 - OPTIONS **
 options{
     IGNORE_CASE = true;
-	
+	MULTI=true;
+	//VISITOR=true;
 }
 
 // ** SECTION 2 - USER CODE **
 PARSER_BEGIN(MyNewGrammar)
-
+import java.io.*;
+import java.util.*;
 public class MyNewGrammar {
+  //hashtable
+  public static Hashtable ST = new Hashtable();
     public static void main(String [] args){
         MyNewGrammar parser;
         String temp;
@@ -38,10 +42,30 @@ public class MyNewGrammar {
           SimpleNode program = parser.program();
           System.out.println("Abstract Syntax Tree:");
 	   	  program.dump(" ");
+	   	  System.out.println();
+		    
       	}catch(ParseException e){
       	  System.out.println(e.getMessage());
 		  return;
       	}
+      	System.out.println("Symbol Table:");
+		
+		    Enumeration t = ST.keys();
+		
+		    while (t.hasMoreElements())
+		    {
+		      temp = (String)t.nextElement();
+		      temp2 = (STC)ST.get(temp);
+		      System.out.println(temp);
+		      if (temp2.type != null)
+		      {
+		        System.out.println(" type = " + temp2.type);
+		      }
+		      if (temp2.value != null)
+		      {
+		        System.out.println(" value = " + temp2.value);
+		      }
+		    }
     }
 }
 
@@ -171,13 +195,13 @@ void var_decl()  #Var:
 void const_decl() #Const:
 {}
 {
-      <CONST> <IDENTIFIER> <COLON> type() <EQUAL> expression() ( <COMMA> <IDENTIFIER> <COLON> type() <EQUAL> expression() )* <SEMICOLON> 
+      <CONST> Identifier() <COLON> type() <EQUAL> expression() ( <COMMA> Identifier() <COLON> type() <EQUAL> expression() )* <SEMICOLON> 
 }
 
 void function() #Function:
 {}
 {
-    type() <IDENTIFIER> <LBRACKET>param_list()<RBRACKET>
+    type() Identifier() <LBRACKET>param_list()<RBRACKET>
      <BEGIN>
      ( decl() )*
      (statement() <SEMICOLON>)*
@@ -188,7 +212,7 @@ void function() #Function:
 void param_list() #Param:
 {}
 {
-    (<IDENTIFIER> <COLON> type() ( <COMMA> <IDENTIFIER> <COLON> type())* | <EPSILON>)
+    (Identifier() <COLON> type() ( <COMMA> Identifier() <COLON> type())* | <EPSILON>)
 }
 
 void type() #Type:
@@ -254,7 +278,7 @@ void expression() :
 void fragment() :
 {}
 {
-    <IDENTIFIER> [arg_list()]|<TRUE>|<FALSE>|<NUMBER>|(<ADD>|<SUBTRACT>)fragment()
+    Identifier() [arg_list()]|<TRUE>|<FALSE>|number()|(<ADD>|<SUBTRACT>)fragment()
 }
 
 //condition :=    NOT condition
@@ -274,13 +298,25 @@ void condition() #Condition:
 void ident_list() #Ident:
 {}
 {
-  <IDENTIFIER>(<COMMA> <IDENTIFIER>)*
+  Identifier()(<COMMA> Identifier())*
 }
 
 
-//arg_list := ( identifier ( , identifier )* | ε  )
+//arg_list := ( Identifier( ( , Identifier( )* | ε  )
 void arg_list() #Args:
 {}
 {
-  (<IDENTIFIER>(<COMMA> <IDENTIFIER>)* | <EPSILON>)
+  (Identifier()(<COMMA> Identifier() )* | <EPSILON>)
 }
+
+String Identifier() #Id : {Token t;}
+{
+  t = <IDENTIFIER> {jjtThis.value = t.image; return t.image;}
+}
+
+void number() : {Token t;}
+{
+  t = <NUMBER> {jjtThis.value = t.image;
+               }
+}
+
