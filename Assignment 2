@@ -1,0 +1,286 @@
+// ** SECTION 1 - OPTIONS **
+options{
+    IGNORE_CASE = true;
+	
+}
+
+// ** SECTION 2 - USER CODE **
+PARSER_BEGIN(MyNewGrammar)
+
+public class MyNewGrammar {
+    public static void main(String [] args){
+        MyNewGrammar parser;
+        String temp;
+	    STC temp2;
+        if(args.length == 0){
+            System.out.println("MyNewGrammar: Reading from Standard Input...");
+            parser = new MyNewGrammar(System.in);
+        }
+        else if(args.length == 1){
+            System.out.println("MyNewGrammar: Reading from file " + args[0] + "...");
+            try{
+                parser = new MyNewGrammar(new java.io.FileInputStream(args[0]));
+            }
+            catch(java.io.FileNotFoundException e){
+                System.out.println("MyNewGrammar: File " + args[0] + "  not found");
+                return;
+            }
+        }
+        else{
+        System.out.println("MyNewGrammar: Usage is one of : ");
+        System.out.println("\t\t java MyNewGrammar < inputFile");
+        System.out.println("OR");
+        System.out.println("\t\t java MyNewGrammar inputFile");
+        return;
+        }
+        try
+        {
+          SimpleNode program = parser.program();
+          System.out.println("Abstract Syntax Tree:");
+	   	  program.dump(" ");
+      	}catch(ParseException e){
+      	  System.out.println(e.getMessage());
+		  return;
+      	}
+    }
+}
+
+PARSER_END(MyNewGrammar)
+
+// ** SECTION 3 - Token Definitions **
+
+TOKEN_MGR_DECLS :
+{
+    static int commentNesting = 0;
+}
+
+SKIP : /* COMMENTS */
+{"/*" { commentNesting++; } : IN_COMMENT
+
+}
+<IN_COMMENT> SKIP :
+{       "/*" { commentNesting++; }
+    | "*/" { commentNesting--;
+            if (commentNesting == 0)
+                SwitchTo(DEFAULT);
+           }
+    | <~[]>
+}
+
+SKIP : // SINGLE LINE COMMENTS
+{
+    <SINGLE_LINE_COMMENT : "--" (~["\n", "\r"])* ("\r" | "\n" | "\r\n") >
+}
+
+SKIP : // IGNORE SPACES, TABS, NEWLINES, FORM FEEDS & CARRIAGE RETURNS
+{
+            " "
+        |   "\t"
+        |   "\n"
+        |   "\f"
+        |   "\r"
+}
+
+TOKEN :  /* KEYWORDS */
+{   <AND : "and">
+    |<BOOL : "bool">
+    |<CONST : "const">
+    |<DO : "do">
+    |<ELSE : "else">
+    |<FALSE : "false">
+    |<IF : "if">
+    |<INT : "int">
+    |<MAIN : "main">
+    |<NOT : "not">
+    |<OR : "or">
+    |<RETURN : "return">
+    |<THEN : "then">
+    |<TRUE : "true">
+    |<VAR : "var">
+    |<VOID : "void">
+    |<WHILE : "while">
+    |<BEGIN : "begin">
+    |<END : "end">
+}
+
+TOKEN :  /* OPERATORS RELATIONS */
+{   <ADD : "+">
+    |<SUBTRACT : "-">
+    |<MULTIPLY : "*">
+    |<DIVIDE : "/">
+    |<EQUAL : "=">
+    |<NOTEQUAL : "!=">
+    |<LESSTHAN : "<">
+    |<GREATERTHAN : ">">
+    |<LESSTHANEQUAL : "<=">
+    |<GREATERTHANEQUAL : ">=">
+    |<LBRACKET : "(">
+    |<RBRACKET : ")">
+    |<COMMA : ",">
+    |<SEMICOLON : ";">
+    |<COLON : ":">
+    |<ASSIGN : ":=">
+    |<EPSILON : "">
+}
+
+TOKEN : /*IDENTIFIERS */
+{
+    < IDENTIFIER : <LETTER> (<LETTER> | <DIGIT> | <UNDERSCORE>)*>
+    | < #LETTER : ["a" - "z", "A" - "Z"] >
+    | < #DIGIT : ["0" - "9"] >
+    | < UNDERSCORE : ["_"] >
+}
+
+TOKEN :  /*NUMBER */
+{
+    <NUMBER : (["0" - "9"])+>
+}
+
+TOKEN : /* ANYTHING NOT RECOGNISED SO FAR */
+{
+    < OTHER : ~[] >
+}
+
+// ** SECTION 4 - Grammar Rules **
+SimpleNode program() #Program:
+{}
+{
+  (
+    ( decl())*
+    ( function())*
+    (main_prog())
+   ) < EOF >
+   {
+	return jjtThis;
+   }
+}
+
+void decl() :
+{}
+{
+    (var_decl() | const_decl())
+}
+
+void var_decl()  #Var:
+{}
+{
+    <VAR> ident_list() <COLON> type() (<COMMA> ident_list() <COLON> type()
+    )* <SEMICOLON>
+}
+
+void const_decl() #Const:
+{}
+{
+      <CONST> <IDENTIFIER> <COLON> type() <EQUAL> expression() ( <COMMA> <IDENTIFIER> <COLON> type() <EQUAL> expression() )* <SEMICOLON> 
+}
+
+void function() #Function:
+{}
+{
+    type() <IDENTIFIER> <LBRACKET>param_list()<RBRACKET>
+     <BEGIN>
+     ( decl() )*
+     (statement() <SEMICOLON>)*
+     <RETURN>(expression() | <EPSILON>)<SEMICOLON>
+     <END>
+}
+
+void param_list() #Param:
+{}
+{
+    (<IDENTIFIER> <COLON> type() ( <COMMA> <IDENTIFIER> <COLON> type())* | <EPSILON>)
+}
+
+void type() #Type:
+{}
+{
+    <INT>
+    {
+      jjtThis.value = token;
+    }
+    |<BOOL>
+    {
+      jjtThis.value = token;
+  	}
+  	|<VOID>
+  	{
+  	  jjtThis.value = token;
+    }
+}
+
+void main_prog() #Main:
+{}
+{
+    <MAIN>
+    <BEGIN>
+    (decl())*
+  	(statement()<SEMICOLON>)*
+    <END>
+}
+
+/*
+statement := identifier := expression
+                | identifier ( arg_list )
+                | BEGIN ( statement ; )* END
+                | IF condition THEN statement ; ELSE statement
+                | WHILE condition DO statement
+                | ε 
+*/
+
+void statement() :
+{}
+{
+    <IDENTIFIER> ( <ASSIGN>  expression()|  (arg_list()))
+    | <BEGIN>(statement() <SEMICOLON>)*<END>
+    | <IF> condition() <THEN> statement() <SEMICOLON> <ELSE> statement()
+    | <WHILE> condition() <DO> statement()
+    | <EPSILON>
+}
+
+/*
+expression := fragment ( ( + | - | * | / )  fragment )*
+                | ( expression ) 
+                | identifier ( arg_list )
+*/
+void expression() :
+{}
+{
+    fragment()((<ADD>|<SUBTRACT>|<MULTIPLY>|<DIVIDE>) condition())*
+	| <LBRACKET>expression()<RBRACKET> 
+  	| <NOT> expression()
+}
+
+//fragment := identifier | TRUE | FALSE | number | ( + | - ) fragment | expression
+void fragment() :
+{}
+{
+    <IDENTIFIER> [arg_list()]|<TRUE>|<FALSE>|<NUMBER>|(<ADD>|<SUBTRACT>)fragment()
+}
+
+//condition :=    NOT condition
+//                | expression ( = | != | < | > | <= | >= ) expression
+//                | condition (AND | OR) condition
+//                | identifier ( arg_list )
+void condition() #Condition:
+{}
+{
+    <NOT> condition()
+    | expression() ((<EQUAL>|<NOTEQUAL>|<LESSTHAN>|<GREATERTHAN>|<GREATERTHANEQUAL>|<LESSTHANEQUAL>)|(<AND>|<OR>)|condition())*
+}
+
+
+
+//ident_list := identifier ( , identifier )*
+void ident_list() #Ident:
+{}
+{
+  <IDENTIFIER>(<COMMA> <IDENTIFIER>)*
+}
+
+
+//arg_list := ( identifier ( , identifier )* | ε  )
+void arg_list() #Args:
+{}
+{
+  (<IDENTIFIER>(<COMMA> <IDENTIFIER>)* | <EPSILON>)
+}
