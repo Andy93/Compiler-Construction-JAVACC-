@@ -1,0 +1,307 @@
+import java.util.*;
+@SuppressWarnings("unchecked")
+public class TypeCheckVisitor implements MyNewGrammarVisitor 
+{
+	private static HashMap<String, HashMap<String, STC>> st = new HashMap<>();
+	private static final String GLOBAL_SCOPE = "Global Scope";
+	private static String currentScope = GLOBAL_SCOPE;
+	private static String previousScope = currentScope;
+	@Override
+	public Object visit(SimpleNode node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTProgram node, Object data) 
+	{
+		st.put(currentScope, new HashMap<String, STC>());
+		node.childrenAccept(this, data);
+		for (String scope : st.keySet()) {
+            HashMap<String, STC> sst = st.get(scope);
+            for (String key : sst.keySet()) {
+                STC printIt = sst.get(key);
+                System.out.println("Kind is       |    " + printIt.getKind());
+                System.out.println("Type is       |    " + printIt.getType());
+                System.out.println("Identifier is |    " + printIt.getIdentifier());
+                System.out.println("Scope is      |    " + printIt.getScope());
+                System.out.println("Data is       |    " + printIt.getData());
+                System.out.println("---------------------------------------->");
+            }
+        }
+		System.out.println("Semantic Checker: ");
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTVar node, Object data) 
+	{
+		for (int i = 0; i < node.jjtGetNumChildren(); i += 2) 
+		{
+			List<Token> identifierList = (List<Token>) node.jjtGetChild(i).jjtAccept(this, data);
+			Token type = (Token) node.jjtGetChild(i+1).jjtAccept(this, data);
+
+			for (Token identifer : identifierList) 
+			{
+				HashMap<String, STC> stableScoped = st.get(currentScope);
+				
+				if (stableScoped == null) 
+				{
+					stableScoped = new HashMap<>();
+				}
+				STC var = new STC(identifer, type.image, currentScope, DataType.VAR);
+				
+				if (stableScoped.get(identifer.image) == null) 
+				{
+					stableScoped.put(identifer.image, var);
+					st.put(currentScope, stableScoped);
+				}
+				else 
+				{
+					System.out.println(identifer.image + " was already declared in " + currentScope);
+				}
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTConst node, Object data) 
+	{
+		HashMap<String, STC> stableScoped = st.get(currentScope);
+		if (stableScoped == null) stableScoped = new HashMap<>();
+
+		for (int i = 0; i < node.jjtGetNumChildren(); i += 3) 
+		{
+			Token identifer = (Token) node.jjtGetChild(i).jjtAccept(this, data);
+			Token type = (Token) node.jjtGetChild(i + 1).jjtAccept(this, data);
+			List<Token> assign;
+            
+            if (node.jjtGetChild(i+2).jjtAccept(this, data) instanceof Token) 
+            {
+                assign = new ArrayList<>();
+                assign.add((Token) node.jjtGetChild(i).jjtAccept(this, data));
+            } 
+
+            else assign = Arrays.asList((Token) node.jjtGetChild(i).jjtAccept(this, data));
+
+            STC var = new STC(identifer, type.image, currentScope, DataType.CONST);
+            
+            
+            var.addData("value", assign);
+
+            if (stableScoped.get(identifer.image) == null) 
+            {
+            	stableScoped.put(identifer.image, var);
+            	st.put(currentScope, stableScoped);
+            }
+            else 
+			{
+            	System.out.println(identifer.image + " was already declared in " + currentScope);
+            }
+		}
+		return null; 
+	}
+
+	@Override
+	public Object visit(ASTFunction node, Object data) 
+	{
+		Token type = (Token) node.jjtGetChild(0).jjtAccept(this, data);
+		Token identifer = (Token) node.jjtGetChild(1).jjtAccept(this, data);
+		List<Token> parameterList = (List<Token>) node.jjtGetChild(2).jjtAccept(this, data);
+
+		STC function = new STC(identifer, type.image, currentScope, DataType.FUNCTION);
+		function.addData("parameters", parameterList);
+
+		HashMap<String, STC> stableAtGlobalScope = st.get(currentScope);
+		if (stableAtGlobalScope.get(identifer.image) == null) 
+		{
+			stableAtGlobalScope.put(identifer.image, function);
+			st.put(currentScope, stableAtGlobalScope);
+		} 
+
+		else 
+		{
+			System.out.println(identifer.image + " already declared in " + currentScope);
+		}
+
+		//change scope for func block.
+		previousScope = currentScope;
+		currentScope = "Function - " + identifer.image + " - scope";
+
+		for (int i = 0; i < parameterList.size(); i += 2) 
+		{
+			Token paramIdentifier = parameterList.get(i);
+			Token paramType = parameterList.get(i + 1);
+			STC funcVar = new STC(paramIdentifier, paramType.image, currentScope, DataType.VAR);
+
+			HashMap<String, STC> stableForFunction = st.get(currentScope);
+			if (stableForFunction == null) stableForFunction = new HashMap<>();
+
+			if (stableForFunction.get(paramIdentifier.image) == null) 
+			{
+				stableForFunction.put(paramIdentifier.image, funcVar);
+				st.put(currentScope, stableForFunction);
+			}
+			else 
+			{
+				System.out.println("Parameter " + paramIdentifier.image + " of type " + paramType.image + " already in scope " + currentScope);
+			}
+		}
+
+		//Token functionBody = (Token) node.jjtGetChild(3).jjtAccept(this, data);
+		currentScope = previousScope;
+
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTParam node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		List<Token> tokens = new ArrayList<Token>();
+		for (int i = 0; i < node.jjtGetNumChildren(); i += 1) 
+		{
+			SimpleNode convertedNode = (SimpleNode) node.jjtGetChild(i);
+			Token child = (Token) convertedNode.jjtGetValue();
+			tokens.add(child);
+		}
+		return tokens;
+	}
+
+	@Override
+	public Object visit(ASTType node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return node.jjtGetValue();
+	}
+
+	@Override
+	public Object visit(ASTmain node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		//return null;
+		currentScope = "Main";
+		return Arrays.asList(node.jjtGetChild(0).jjtAccept(this, data), node.jjtGetChild(1).jjtAccept(this, data));
+	}
+
+	@Override
+	public Object visit(ASTaddExpr node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return Arrays.asList(node.jjtGetChild(0).jjtAccept(this, data), node.jjtGetChild(1).jjtAccept(this, data)); //
+	}
+
+	@Override
+	public Object visit(ASTsubExpr node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return Arrays.asList(node.jjtGetChild(0).jjtAccept(this, data), node.jjtGetChild(1).jjtAccept(this, data));
+	}
+
+	@Override
+	public Object visit(ASTmulExpr node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return Arrays.asList(node.jjtGetChild(0).jjtAccept(this, data), node.jjtGetChild(1).jjtAccept(this, data));
+	}
+
+	@Override
+	public Object visit(ASTdivExpr node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return Arrays.asList(node.jjtGetChild(0).jjtAccept(this, data), node.jjtGetChild(1).jjtAccept(this, data));
+	}
+
+	@Override
+	public Object visit(ASTBoolean node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return null;
+		//return node.jjtGetValue();
+	}
+
+	@Override
+	public Object visit(ASTNum node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTaddFrag node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		node.childrenAccept(this, data);
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTsubFrag node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		node.childrenAccept(this, data);
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTIdent node, Object data) 
+	{
+		List<Token> tokens = new ArrayList<>();
+		for (int i = 0; i < node.jjtGetNumChildren(); i++) 
+		{
+			SimpleNode convertedNode = (SimpleNode) node.jjtGetChild(i);
+			Token identifer = (Token) convertedNode.jjtGetValue();
+			tokens.add(identifer);
+		}
+		return tokens;
+	}
+
+	@Override
+	public Object visit(ASTArgs node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTId node, Object data) 
+	{
+		// TODO Auto-generated method stub
+		return node.jjtGetValue();
+	}
+	//not generated
+	void test(SimpleNode node, Object data) 
+	{
+		node.childrenAccept(this, data);
+		for (int i = 0; i < node.jjtGetNumChildren(); i++) 
+		{
+			SimpleNode x = (SimpleNode) node.jjtGetChild(i);
+			if (x.jjtGetValue() != null) System.out.print(x.jjtGetValue() + " ");
+		} 
+	}
+
+	void print(Object i) 
+	{
+		System.out.println(i);
+	}
+
+	@Override
+	public Object visit(ASTexpression node, Object data) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTfragment node, Object data) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Object visit(ASTCondition node, Object data) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+}
