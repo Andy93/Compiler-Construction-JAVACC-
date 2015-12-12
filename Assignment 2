@@ -2,7 +2,8 @@
 options{
     IGNORE_CASE = true;
 	MULTI=true;
-	//VISITOR=true;
+	VISITOR=true;
+	JAVA_UNICODE_ESCAPE=true;
 }
 
 // ** SECTION 2 - USER CODE **
@@ -43,14 +44,8 @@ public class MyNewGrammar {
           System.out.println("Abstract Syntax Tree:");
 	   	  program.dump(" ");
 	   	  System.out.println();
-		    
-      	}catch(ParseException e){
-      	  System.out.println(e.getMessage());
-		  return;
-      	}
-      	System.out.println("Symbol Table:");
-		
-		    Enumeration t = ST.keys();
+		  
+		   /*// Enumeration t = ST.keys();
 		
 		    while (t.hasMoreElements())
 		    {
@@ -66,6 +61,18 @@ public class MyNewGrammar {
 		        System.out.println(" value = " + temp2.value);
 		      }
 		    }
+		    */
+            System.out.println();
+		    System.out.println("Symbol Table:");
+		    System.out.println("---------------------------------------->");
+		    TypeCheckVisitor st = new TypeCheckVisitor();
+		    
+		    program.jjtAccept(st, null);
+      	}catch(ParseException e){
+      	  System.out.println(e.getMessage());
+		  return;
+      	}
+      	
     }
 }
 
@@ -179,7 +186,7 @@ SimpleNode program() #Program:
    }
 }
 
-void decl() :
+void decl() #void:
 {}
 {
     (var_decl() | const_decl())
@@ -232,7 +239,7 @@ void type() #Type:
     }
 }
 
-void main_prog() #Main:
+void main_prog() #main:
 {}
 {
     <MAIN>
@@ -251,7 +258,7 @@ statement := identifier := expression
                 | ε 
 */
 
-void statement() :
+void statement() #void:
 {}
 {
     <IDENTIFIER> ( <ASSIGN>  expression()|  (arg_list()))
@@ -266,35 +273,50 @@ expression := fragment ( ( + | - | * | / )  fragment )*
                 | ( expression ) 
                 | identifier ( arg_list )
 */
+
 void expression() :
-{}
+{Token t;}
 {
-    fragment()((<ADD>|<SUBTRACT>|<MULTIPLY>|<DIVIDE>) condition())*
+    fragment()((
+      ( t = <ADD> {jjtThis.value = t.image;})#addExpr
+      |( t = <SUBTRACT>{jjtThis.value = t.image;})#subExpr
+      |( t = <MULTIPLY>{jjtThis.value = t.image;})#mulExpr
+      |( t = <DIVIDE>{jjtThis.value = t.image;})#divExpr) condition())*
 	| <LBRACKET>expression()<RBRACKET> 
-  	| <NOT> expression()
+  	| <NOT> expression() 
 }
 
 //fragment := identifier | TRUE | FALSE | number | ( + | - ) fragment | expression
+
 void fragment() :
-{}
+{Token t;}
 {
-    Identifier() [arg_list()]|<TRUE>|<FALSE>|number()|(<ADD>|<SUBTRACT>)fragment()
+    Identifier() [arg_list()]|(Bool())
+    |number()
+    |((t = <ADD> {jjtThis.value = t.image;})#addFrag|(t = <SUBTRACT> {jjtThis.value = t.image;})#subFrag)fragment()
 }
 
 //condition :=    NOT condition
 //                | expression ( = | != | < | > | <= | >= ) expression
 //                | condition (AND | OR) condition
 //                | identifier ( arg_list )
+
 void condition() #Condition:
-{}
+{Token t;}
 {
-    <NOT> condition()
-    | expression() ((<EQUAL>|<NOTEQUAL>|<LESSTHAN>|<GREATERTHAN>|<GREATERTHANEQUAL>|<LESSTHANEQUAL>)|(<AND>|<OR>)|condition())*
+    <NOT> condition() 
+    | expression() ((t = <EQUAL> {jjtThis.value = t.image;})
+    |(t = <NOTEQUAL> {jjtThis.value = t.image;})
+    |(t = <LESSTHAN> {jjtThis.value = t.image;})
+    |(t = <GREATERTHAN> {jjtThis.value = t.image;})
+    |(t = <GREATERTHANEQUAL> {jjtThis.value = t.image;})
+    |(t = <LESSTHANEQUAL> {jjtThis.value = t.image;})|(<AND>|<OR>)|condition())*
 }
 
 
 
 //ident_list := identifier ( , identifier )*
+
 void ident_list() #Ident:
 {}
 {
@@ -303,20 +325,24 @@ void ident_list() #Ident:
 
 
 //arg_list := ( Identifier( ( , Identifier( )* | ε  )
+
 void arg_list() #Args:
 {}
 {
   (Identifier()(<COMMA> Identifier() )* | <EPSILON>)
 }
 
-String Identifier() #Id : {Token t;}
+void Identifier() #Id : {Token token;}
 {
-  t = <IDENTIFIER> {jjtThis.value = t.image; return t.image;}
+  token = <IDENTIFIER> {jjtThis.value = token;}
 }
 
-void number() : {Token t;}
-{
-  t = <NUMBER> {jjtThis.value = t.image;
-               }
+void Bool() #Boolean: {Token t;} {
+	<TRUE> { jjtThis.value = token; } 
+	| <FALSE> { jjtThis.value = token; }
 }
 
+void number() #Num: {Token t;}
+{
+  t = <NUMBER> {jjtThis.value = t.image;}
+}
